@@ -1,20 +1,23 @@
 ﻿using System;
-using System.Diagnostics.Metrics;
-using System.Formats.Asn1;
-using System.Globalization;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
+using RadencyTask1.classes.payment;
 using System.IO;
+using Microsoft.VisualBasic;
 
 namespace RadencyTask1.classes
 {
     public class FileProcessing
     {
         private readonly FileSystemWatcher _watcher;
-        private List<string> _data;
+        private List<PaymentProcessed> paymentList;
 
         public FileProcessing(string rootDirectory)
         {
             _watcher = new FileSystemWatcher(rootDirectory);
-            _data = new List<string>();
+            paymentList = new List<PaymentProcessed>();
         }
 
         public async void Configure()
@@ -52,15 +55,19 @@ namespace RadencyTask1.classes
                         {
                             while (!reader.EndOfStream)
                             {
-                                var line = reader.ReadLine();
-                                _data.Add(line);
-                                Console.WriteLine(line);
+                                try
+                                {
+                                    PaymentRaw paymentRaw = new PaymentRaw(reader.ReadLine());
+                                    PaymentProcessed.Add(paymentList, paymentRaw);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine(ex.Message);
+                                }
                             }
                         }
                     }
                     catch { }
-                    Console.WriteLine(1);
-
                 }
 
                 Console.WriteLine($"Changed: {e.FullPath}");
@@ -87,7 +94,7 @@ namespace RadencyTask1.classes
                 Console.WriteLine($"    New: {e.FullPath}");
             }
 
-            void OnError(object sender, ErrorEventArgs e) =>
+            void OnError(object sender, System.IO.ErrorEventArgs e) =>
                 PrintException(e.GetException());
 
             void PrintException(Exception? ex)
@@ -101,6 +108,18 @@ namespace RadencyTask1.classes
                     PrintException(ex.InnerException);
                 }
             }
+        }
+
+        public async void SaveDataToJson(string rootDirectory)
+        {
+            if (!Directory.Exists(rootDirectory))
+            {
+                Directory.CreateDirectory(rootDirectory);
+            }
+            rootDirectory = Path.Combine(rootDirectory, "data.json");
+            var json = JsonConvert.SerializeObject(paymentList);
+            Console.WriteLine(json);
+            File.WriteAllText(rootDirectory, json);
         }
     }
 }
