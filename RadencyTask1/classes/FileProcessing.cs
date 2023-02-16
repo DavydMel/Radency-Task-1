@@ -13,11 +13,15 @@ namespace RadencyTask1.classes
     {
         private readonly FileSystemWatcher _watcher;
         private List<PaymentProcessed> paymentList;
+        private string outputPath;
+        private int fileNumber;
 
-        public FileProcessing(string rootDirectory)
+        public FileProcessing(string inputPath, string outputPath)
         {
-            _watcher = new FileSystemWatcher(rootDirectory);
+            _watcher = new FileSystemWatcher(inputPath);
             paymentList = new List<PaymentProcessed>();
+            fileNumber = 1;
+            this.outputPath = outputPath;
         }
 
         public async void Configure()
@@ -31,67 +35,45 @@ namespace RadencyTask1.classes
                                  | NotifyFilters.Security
                                  | NotifyFilters.Size;
 
-            _watcher.Changed += OnChanged;
             _watcher.Created += OnCreated;
-            _watcher.Deleted += OnDeleted;
-            _watcher.Renamed += OnRenamed;
             _watcher.Error += OnError;
 
             //_watcher.Filter = "*.txt";
             _watcher.EnableRaisingEvents = true;
 
-            void OnChanged(object sender, FileSystemEventArgs e)
+            async void OnCreated(object sender, FileSystemEventArgs e)
             {
-                if (e.ChangeType != WatcherChangeTypes.Changed)
-                {
-                    return;
-                }
-
                 if (Path.GetExtension(e.FullPath) == ".txt" || Path.GetExtension(e.FullPath) == ".csv")
                 {
                     try
                     {
                         using (var reader = new StreamReader(e.FullPath))
                         {
-                            while (!reader.EndOfStream)
+                            lock(paymentList)
                             {
-                                try
+                                while (!reader.EndOfStream)
                                 {
-                                    PaymentRaw paymentRaw = new PaymentRaw(reader.ReadLine());
-                                    PaymentProcessed.Add(paymentList, paymentRaw);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine(ex.Message);
+                                    try
+                                    {
+                                        PaymentRaw paymentRaw = new PaymentRaw(reader.ReadLine());
+                                        PaymentProcessed.Add(paymentList, paymentRaw);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine(ex.Message);
+                                    }
                                 }
                             }
                         }
                     }
                     catch { }
+
+                    if (paymentList.Count > 0)
+                    {
+                        await SaveDataToJson();
+                        Console.WriteLine($"Added: {e.FullPath}");
+                    }
                 }
-
-                Console.WriteLine($"Changed: {e.FullPath}");
-            }
-
-            void OnCreated(object sender, FileSystemEventArgs e)
-            {
-                if (Path.GetExtension(e.FullPath) != ".txt" && Path.GetExtension(e.FullPath) != ".csv")
-                {
-                    return;
-                }
-
-                string value = $"Created: {e.FullPath}";
-                Console.WriteLine(value);
-            }
-
-            void OnDeleted(object sender, FileSystemEventArgs e) =>
-                Console.WriteLine($"Deleted: {e.FullPath}");
-
-            void OnRenamed(object sender, RenamedEventArgs e)
-            {
-                Console.WriteLine($"Renamed:");
-                Console.WriteLine($"    Old: {e.OldFullPath}");
-                Console.WriteLine($"    New: {e.FullPath}");
             }
 
             void OnError(object sender, System.IO.ErrorEventArgs e) =>
@@ -110,16 +92,28 @@ namespace RadencyTask1.classes
             }
         }
 
-        public async void SaveDataToJson(string rootDirectory)
+        public async Task SaveDataToJson()
         {
+            string rootDirectory = outputPath;
             if (!Directory.Exists(rootDirectory))
             {
                 Directory.CreateDirectory(rootDirectory);
             }
-            rootDirectory = Path.Combine(rootDirectory, "data.json");
-            var json = JsonConvert.SerializeObject(paymentList);
-            Console.WriteLine(json);
-            File.WriteAllText(rootDirectory, json);
+            rootDirectory = Path.Combine(rootDirectory, DateTime.Now.ToString("MM-dd-yyyy")); 
+            if (!Directory.Exists(rootDirectory))
+            {
+                Directory.CreateDirectory(rootDirectory);
+            }
+            rootDirectory = Path.Combine(rootDirectory, $"output{fileNumber}.json");
+            fileNumber++;
+
+            lock(paymentList)
+            {
+                string json = JsonConvert.SerializeObject(paymentList);
+                File.WriteAllText(rootDirectory, json);
+
+                paymentList.Clear();
+            }
         }
     }
 }

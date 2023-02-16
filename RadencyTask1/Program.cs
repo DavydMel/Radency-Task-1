@@ -3,12 +3,14 @@ using RadencyTask1.classes;
 
 if (ConfigurationManager.AppSettings["PathInput"] != null)
 {
-    var fileProc = new FileProcessing(ConfigurationManager.AppSettings.Get("PathInput"));
+    var fileProc = new FileProcessing(
+        ConfigurationManager.AppSettings.Get("PathInput"),
+        ConfigurationManager.AppSettings.Get("PathOuput")
+        );
     fileProc.Configure();
 
     Console.WriteLine("Program is running...\n");
     Console.WriteLine("0 - type to exit");
-    Console.WriteLine("1 - type to save json data");
     int action = -1;
     while (action != 0)
     {
@@ -28,13 +30,6 @@ if (ConfigurationManager.AppSettings["PathInput"] != null)
                 {
                     Console.WriteLine("Exiting...");
                     Environment.Exit(1);
-                    break;
-                }
-            case 1:
-                {
-                    string outputPath = ConfigurationManager.AppSettings.Get("PathOuput");
-                    Console.WriteLine("Saving data to json");
-                    fileProc.SaveDataToJson(outputPath);
                     break;
                 }
             default:
