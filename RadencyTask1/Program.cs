@@ -11,6 +11,7 @@ if (ConfigurationManager.AppSettings["PathInput"] != null)
 
     Console.WriteLine("Program is running...\n");
     Console.WriteLine("0 - type to exit");
+    Console.WriteLine("1 - type to save mata.log file");
     int action = -1;
     while (action != 0)
     {
@@ -30,6 +31,12 @@ if (ConfigurationManager.AppSettings["PathInput"] != null)
                 {
                     Console.WriteLine("Exiting...");
                     Environment.Exit(1);
+                    break;
+                }
+            case 1:
+                {
+                    Console.WriteLine("Saving meta.log file...");
+                    fileProc.CreateLogManually();
                     break;
                 }
             default:

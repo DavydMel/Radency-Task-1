@@ -6,6 +6,9 @@ using Newtonsoft.Json.Linq;
 using RadencyTask1.classes.payment;
 using System.IO;
 using Microsoft.VisualBasic;
+using Quartz;
+using Quartz.Impl;
+using RadencyTask1.classes.schedule;
 
 namespace RadencyTask1.classes
 {
@@ -15,6 +18,10 @@ namespace RadencyTask1.classes
         private List<PaymentProcessed> paymentList;
         private string outputPath;
         private int fileNumber;
+        //private int parsedLines;
+        //private int errorLines;
+        //private List<string> errorFilesPath;
+        private IScheduler scheduler;
 
         public FileProcessing(string inputPath, string outputPath)
         {
@@ -22,6 +29,9 @@ namespace RadencyTask1.classes
             paymentList = new List<PaymentProcessed>();
             fileNumber = 1;
             this.outputPath = outputPath;
+            //parsedLines = 0;
+            //errorLines = 0;
+            //errorFilesPath = new List<string>();
         }
 
         public async void Configure()
@@ -41,6 +51,21 @@ namespace RadencyTask1.classes
             //_watcher.Filter = "*.txt";
             _watcher.EnableRaisingEvents = true;
 
+            StdSchedulerFactory factory = new StdSchedulerFactory();
+            scheduler = await factory.GetScheduler();
+            await scheduler.Start();
+            IJobDetail job = JobBuilder.Create<LoggingJob>()
+                .WithIdentity("logging")
+                .Build();
+            LoggingJob.outputPath = outputPath;
+
+            ITrigger trigger = TriggerBuilder.Create()
+                          .WithIdentity("triggerLogging")
+                          .WithSchedule(CronScheduleBuilder
+                          .DailyAtHourAndMinute(0, 0))
+                          .Build();
+            await scheduler.ScheduleJob(job, trigger);
+
             async void OnCreated(object sender, FileSystemEventArgs e)
             {
                 if (Path.GetExtension(e.FullPath) == ".txt" || Path.GetExtension(e.FullPath) == ".csv")
@@ -57,9 +82,11 @@ namespace RadencyTask1.classes
                                     {
                                         PaymentRaw paymentRaw = new PaymentRaw(reader.ReadLine());
                                         PaymentProcessed.Add(paymentList, paymentRaw);
+                                        LoggingJob.parsedLines++;
                                     }
                                     catch (Exception ex)
                                     {
+                                        LoggingJob.errorLines++;
                                         Console.WriteLine(ex.Message);
                                     }
                                 }
@@ -74,6 +101,11 @@ namespace RadencyTask1.classes
                         Console.WriteLine($"Added: {e.FullPath}");
                     }
                 }
+                else
+                {
+                    LoggingJob.errorFilesPath.Add(e.FullPath);
+                }
+                LoggingJob.fileAmount++;
             }
 
             void OnError(object sender, System.IO.ErrorEventArgs e) =>
@@ -92,6 +124,7 @@ namespace RadencyTask1.classes
             }
         }
 
+
         public async Task SaveDataToJson()
         {
             string rootDirectory = outputPath;
@@ -99,7 +132,7 @@ namespace RadencyTask1.classes
             {
                 Directory.CreateDirectory(rootDirectory);
             }
-            rootDirectory = Path.Combine(rootDirectory, DateTime.Now.ToString("MM-dd-yyyy")); 
+            rootDirectory = Path.Combine(rootDirectory, DateTime.Now.ToString("MM-dd-yyyy"));
             if (!Directory.Exists(rootDirectory))
             {
                 Directory.CreateDirectory(rootDirectory);
@@ -114,6 +147,11 @@ namespace RadencyTask1.classes
 
                 paymentList.Clear();
             }
+        }
+
+        public void CreateLogManually()
+        {
+            scheduler.TriggerJob(new JobKey("logging"));
         }
     }
 }
