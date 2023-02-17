@@ -1,11 +1,5 @@
-﻿using System;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
 using RadencyTask1.classes.payment;
-using System.IO;
-using Microsoft.VisualBasic;
 using Quartz;
 using Quartz.Impl;
 using RadencyTask1.classes.schedule;
@@ -14,13 +8,11 @@ namespace RadencyTask1.classes
 {
     public class FileProcessing
     {
-        private readonly FileSystemWatcher _watcher;
+        private FileSystemWatcher _watcher;
         private List<PaymentProcessed> paymentList;
+        private string inputPath;
         private string outputPath;
         private int fileNumber;
-        //private int parsedLines;
-        //private int errorLines;
-        //private List<string> errorFilesPath;
         private IScheduler scheduler;
 
         public FileProcessing(string inputPath, string outputPath)
@@ -28,13 +20,11 @@ namespace RadencyTask1.classes
             _watcher = new FileSystemWatcher(inputPath);
             paymentList = new List<PaymentProcessed>();
             fileNumber = 1;
+            this.inputPath = inputPath;
             this.outputPath = outputPath;
-            //parsedLines = 0;
-            //errorLines = 0;
-            //errorFilesPath = new List<string>();
         }
 
-        public async void Configure()
+        public async void ConfigureWatcher()
         {
             _watcher.NotifyFilter = NotifyFilters.Attributes
                                  | NotifyFilters.CreationTime
@@ -50,21 +40,6 @@ namespace RadencyTask1.classes
 
             //_watcher.Filter = "*.txt";
             _watcher.EnableRaisingEvents = true;
-
-            StdSchedulerFactory factory = new StdSchedulerFactory();
-            scheduler = await factory.GetScheduler();
-            await scheduler.Start();
-            IJobDetail job = JobBuilder.Create<LoggingJob>()
-                .WithIdentity("logging")
-                .Build();
-            LoggingJob.outputPath = outputPath;
-
-            ITrigger trigger = TriggerBuilder.Create()
-                          .WithIdentity("triggerLogging")
-                          .WithSchedule(CronScheduleBuilder
-                          .DailyAtHourAndMinute(0, 0))
-                          .Build();
-            await scheduler.ScheduleJob(job, trigger);
 
             async void OnCreated(object sender, FileSystemEventArgs e)
             {
@@ -124,6 +99,23 @@ namespace RadencyTask1.classes
             }
         }
 
+        public async void ConfigureScheduleLogging()
+        {
+            StdSchedulerFactory factory = new StdSchedulerFactory();
+            scheduler = await factory.GetScheduler();
+            await scheduler.Start();
+            IJobDetail job = JobBuilder.Create<LoggingJob>()
+                .WithIdentity("logging")
+                .Build();
+            LoggingJob.outputPath = outputPath;
+
+            ITrigger trigger = TriggerBuilder.Create()
+                          .WithIdentity("triggerLogging")
+                          .WithSchedule(CronScheduleBuilder
+                          .DailyAtHourAndMinute(0, 0))
+                          .Build();
+            await scheduler.ScheduleJob(job, trigger);
+        }
 
         public async Task SaveDataToJson()
         {
@@ -152,6 +144,13 @@ namespace RadencyTask1.classes
         public void CreateLogManually()
         {
             scheduler.TriggerJob(new JobKey("logging"));
+        }
+
+        public void Restart()
+        {
+            _watcher.Dispose();
+            _watcher = new FileSystemWatcher(inputPath);
+            ConfigureWatcher();
         }
     }
 }

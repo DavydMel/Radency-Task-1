@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace RadencyTask1.classes.payment
+﻿namespace RadencyTask1.classes.payment
 {
     public class Service
     {

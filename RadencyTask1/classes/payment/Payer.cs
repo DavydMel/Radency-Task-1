@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace RadencyTask1.classes.payment
+﻿namespace RadencyTask1.classes.payment
 {
     public class Payer
     {
